@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669"/>
+      <stop offset="50%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#eab308"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+
+  <!-- Store Icon -->
+  <g transform="translate(106, 96)" filter="url(#dropShadow)">
+    <path d="M150 20 L280 90 L20 90 Z" fill="#ffffff" opacity="0.95"/>
+    <rect x="20" y="90" width="260" height="30" rx="8" fill="url(#goldGrad)"/>
+    <circle cx="50" cy="120" r="16" fill="url(#goldGrad)"/>
+    <circle cx="100" cy="120" r="16" fill="url(#goldGrad)"/>
+    <circle cx="150" cy="120" r="16" fill="url(#goldGrad)"/>
+    <circle cx="200" cy="120" r="16" fill="url(#goldGrad)"/>
+    <circle cx="250" cy="120" r="16" fill="url(#goldGrad)"/>
+
+    <rect x="40" y="140" width="220" height="150" rx="20" fill="#ffffff"/>
+    <rect x="75" y="190" width="60" height="100" rx="10" fill="#047857"/>
+    
+    <g transform="translate(160, 180)">
+      <rect x="0" y="25" width="70" height="50" rx="8" fill="#e2e8f0"/>
+      <rect x="8" y="10" width="54" height="20" rx="5" fill="#0f172a"/>
+      <rect x="14" y="15" width="42" height="10" rx="2" fill="#10b981"/>
+      <line x1="12" y1="58" x2="58" y2="58" stroke="#94a3b8" stroke-width="4" stroke-linecap="round"/>
+      <path d="M45 0 L55 0 L55 10 L45 10 Z" fill="#ffffff"/>
+    </g>
+  </g>
+
+  <g transform="translate(256, 430)">
+    <text text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="34" fill="#ffffff" letter-spacing="2">
+      EASY VENTE
+    </text>
+  </g>
+</svg>
