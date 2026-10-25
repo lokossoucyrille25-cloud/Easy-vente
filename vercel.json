@@ -7,6 +7,15 @@
   ],
   "headers": [
     {
+      "source": "/logout",
+      "headers": [
+        {
+          "key": "Clear-Site-Data",
+          "value": "\"cache\", \"cookies\", \"storage\""
+        }
+      ]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {
@@ -64,6 +73,10 @@
         {
           "key": "Origin-Agent-Cluster",
           "value": "?1"
+        },
+        {
+          "key": "Clear-Site-Data",
+          "value": "\"cache\""
         }
       ]
     }
