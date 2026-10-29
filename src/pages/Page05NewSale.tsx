@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
+import { savePendingSale } from '../lib/offlineSync'
 import type { Product, Customer } from '../types/database'
 import { 
   Search, 
@@ -87,25 +88,26 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
 
   const vatAmount = useMemo(() => {
     if (!shop?.vat_enabled) return 0
-    return Math.round(((subtotal - discount) * (shop.vat_rate / 100)))
-  }, [subtotal, discount, shop?.vat_enabled, shop?.vat_rate])
+    return Math.round(((subtotal - discount) * ((shop.vat_rate || 0) / 100)))
+  }, [subtotal, discount, shop])
 
   const total = useMemo(() => {
     return Math.max(0, subtotal - discount + vatAmount)
   }, [subtotal, discount, vatAmount])
 
-  // Ajustement automatique du montant payé par défaut lors du passage en caisse
-  useEffect(() => {
-    if (paymentMethod === 'credit') {
-      setPaidAmount(0)
-    } else if (paymentMethod === 'cash' || paymentMethod === 'mobile_money') {
-      setPaidAmount(total)
-    }
-  }, [paymentMethod, total])
-
   const remainingAmount = useMemo(() => {
     return Math.max(0, total - paidAmount)
   }, [total, paidAmount])
+
+  // Gestion du mode de règlement et du montant encaissé par défaut
+  const handleSelectPaymentMethod = (method: 'cash' | 'mobile_money' | 'credit' | 'split') => {
+    setPaymentMethod(method)
+    if (method === 'credit') {
+      setPaidAmount(0)
+    } else if (method === 'cash' || method === 'mobile_money') {
+      setPaidAmount(total)
+    }
+  }
 
   // Actions Panier
   const addToCart = (product: Product) => {
@@ -138,7 +140,7 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
     setCart((prev) => prev.filter((item) => item.product.id !== productId))
   }
 
-  // Validation de la vente via la RPC atomique Supabase
+  // Validation de la vente via la RPC atomique Supabase (avec fallback hors-ligne automatique)
   const handleValidateSale = async () => {
     setErrorMsg(null)
 
@@ -154,24 +156,76 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
 
     setSubmitting(true)
 
-    try {
-      const itemsPayload = cart.map((i) => ({
-        product_id: i.product.id,
-        quantity: i.quantity,
-        unit_price: i.unit_price,
-      }))
+    const itemsPayload = cart.map((i) => ({
+      product_id: i.product.id,
+      product_name: i.product.name,
+      quantity: i.quantity,
+      unit_price: i.unit_price,
+    }))
 
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine
+
+    // 1. Si déjà hors-ligne : sauvegarde directe dans la file d'attente locale
+    if (isOffline) {
+      try {
+        savePendingSale({
+          customer_id: selectedCustomerId || null,
+          discount,
+          vat_amount: vatAmount,
+          payment_method: paymentMethod,
+          paid_amount: paidAmount,
+          items: itemsPayload,
+          notes: notes || null,
+          total,
+        })
+
+        alert("Mode hors-ligne : La vente a été enregistrée avec succès sur cet appareil. Elle sera automatiquement synchronisée avec Supabase dès que la connexion sera rétablie.")
+        setCart([])
+        onNavigate('offline-sync')
+      } catch (saveErr) {
+        console.error('Erreur sauvegarde hors-ligne:', saveErr)
+        setErrorMsg('Erreur lors de la sauvegarde locale de la vente.')
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
+    // 2. Si en ligne : exécution de la transaction atomique Supabase
+    try {
       const { data, error } = await supabase.rpc('create_sale_transaction', {
         p_customer_id: selectedCustomerId || null,
         p_discount: discount,
         p_vat_amount: vatAmount,
         p_payment_method: paymentMethod,
         p_paid_amount: paidAmount,
-        p_items: itemsPayload,
+        p_items: itemsPayload.map(({ product_id, quantity, unit_price }) => ({
+          product_id,
+          quantity,
+          unit_price,
+        })),
         p_notes: notes || null,
       })
 
       if (error) {
+        // En cas d'erreur réseau, basculer sur la file d'attente hors-ligne
+        if (error.message?.includes('fetch') || error.message?.includes('NetworkError') || !navigator.onLine) {
+          savePendingSale({
+            customer_id: selectedCustomerId || null,
+            discount,
+            vat_amount: vatAmount,
+            payment_method: paymentMethod,
+            paid_amount: paidAmount,
+            items: itemsPayload,
+            notes: notes || null,
+            total,
+          })
+          alert("Connexion instable : Votre vente a été sauvegardée dans la file locale pour éviter toute perte. Elle sera synchronisée sous peu.")
+          setCart([])
+          onNavigate('offline-sync')
+          return
+        }
+
         setErrorMsg(error.message || 'Erreur lors de la validation de la vente.')
         setSubmitting(false)
         return
@@ -185,8 +239,21 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
         onNavigate('sales-history')
       }
     } catch (err) {
-      console.error('Erreur vente:', err)
-      setErrorMsg('Erreur inattendue lors de la transaction.')
+      console.warn('Erreur réseau durant la vente, repli sur le stockage hors-ligne:', err)
+      savePendingSale({
+        customer_id: selectedCustomerId || null,
+        discount,
+        vat_amount: vatAmount,
+        payment_method: paymentMethod,
+        paid_amount: paidAmount,
+        items: itemsPayload,
+        notes: notes || null,
+        total,
+      })
+      alert("Coupure réseau détectée : La transaction a été sécurisée localement et sera transmise automatiquement.")
+      setCart([])
+      onNavigate('offline-sync')
+    } finally {
       setSubmitting(false)
     }
   }
@@ -335,7 +402,12 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
             <div className="fixed bottom-16 md:bottom-6 left-0 md:left-64 lg:left-72 right-0 p-4 max-w-lg md:max-w-xl mx-auto z-30">
               <button
                 type="button"
-                onClick={() => setStep('checkout')}
+                onClick={() => {
+                  if (paymentMethod !== 'credit') {
+                    setPaidAmount(total)
+                  }
+                  setStep('checkout')
+                }}
                 className="w-full py-4 px-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-3xl shadow-xl flex items-center justify-between font-bold active:scale-[0.98] transition cursor-pointer"
               >
                 <div className="flex items-center gap-2">
@@ -470,7 +542,7 @@ export const Page05NewSale: React.FC<Page05NewSaleProps> = ({ onNavigate }) => {
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => setPaymentMethod(m.id as any)}
+                  onClick={() => handleSelectPaymentMethod(m.id as any)}
                   className={`py-3 px-2 rounded-2xl text-xs font-bold border flex flex-col items-center justify-center gap-1 transition cursor-pointer ${
                     paymentMethod === m.id
                       ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/25'

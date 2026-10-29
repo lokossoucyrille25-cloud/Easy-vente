@@ -7,20 +7,20 @@ interface BeforeInstallPromptEvent extends Event {
 
 export function usePWAInstall() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isInstalled, setIsInstalled] = useState<boolean>(false)
-  const [isIOS, setIsIOS] = useState<boolean>(false)
-
-  useEffect(() => {
-    // Détection PWA déjà installée en mode standalone
-    const isStandalone =
+  const [isInstalled, setIsInstalled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return (
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as unknown as { standalone?: boolean }).standalone === true
-    setIsInstalled(isStandalone)
-
-    // Détection iOS (Safari ne supporte pas beforeinstallprompt, nécessite ajout manuel)
+    )
+  })
+  const [isIOS] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
     const ua = window.navigator.userAgent.toLowerCase()
-    const iosDevice = /iphone|ipad|ipod/.test(ua)
-    setIsIOS(iosDevice)
+    return /iphone|ipad|ipod/.test(ua)
+  })
+
+  useEffect(() => {
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()

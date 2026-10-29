@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { Store, User, Mail, Lock, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { Store, User, Mail, Lock, AlertCircle, ArrowLeft, CheckCircle2, Camera, X } from 'lucide-react'
 
 interface Page02RegisterProps {
   onNavigate: (page: string) => void
@@ -10,12 +10,31 @@ export const Page02Register: React.FC<Page02RegisterProps> = ({ onNavigate }) =>
   const { signUp } = useAuth()
   const [fullName, setFullName] = useState('')
   const [shopName, setShopName] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg("L'image du logo ne doit pas dépasser 2 Mo.")
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setLogoUrl(reader.result)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -38,7 +57,13 @@ export const Page02Register: React.FC<Page02RegisterProps> = ({ onNavigate }) =>
     }
 
     setLoading(true)
-    const { error } = await signUp(email.trim(), password, fullName.trim(), shopName.trim())
+    const { error } = await signUp(
+      email.trim(),
+      password,
+      fullName.trim(),
+      shopName.trim(),
+      logoUrl || undefined
+    )
     setLoading(false)
 
     if (error) {
@@ -102,6 +127,48 @@ export const Page02Register: React.FC<Page02RegisterProps> = ({ onNavigate }) =>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3.5">
+            {/* Logo de la boutique */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
+                Logo de la boutique (Affiché sur vos reçus & factures)
+              </label>
+              <div className="flex items-center gap-3.5 p-3 bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/80 rounded-2xl">
+                <div className="relative w-14 h-14 rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                  {logoUrl ? (
+                    <>
+                      <img src={logoUrl} alt="Logo aperçu" className="w-full h-full object-contain p-1" />
+                      <button
+                        type="button"
+                        onClick={() => setLogoUrl(null)}
+                        className="absolute top-0.5 right-0.5 bg-rose-600 text-white rounded-full p-0.5 shadow cursor-pointer hover:bg-rose-700"
+                        title="Supprimer ce logo"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </>
+                  ) : (
+                    <Store className="w-6 h-6 text-slate-400" />
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl cursor-pointer transition shadow-xs">
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{logoUrl ? 'Changer de logo' : 'Choisir un logo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  <p className="text-[11px] text-slate-400 mt-1 truncate">
+                    PNG, JPG ou SVG (Max 2 Mo)
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
                 Nom de la boutique

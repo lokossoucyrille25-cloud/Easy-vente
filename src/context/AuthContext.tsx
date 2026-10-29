@@ -14,7 +14,7 @@ interface AuthContextType {
   shop: Shop | null
   loading: boolean
   signIn: (email: string, password: string, options?: SignInOptions) => Promise<{ error: Error | null }>
-  signUp: (email: string, password: string, fullName: string, shopName: string) => Promise<{ error: Error | null }>
+  signUp: (email: string, password: string, fullName: string, shopName: string, logoUrl?: string) => Promise<{ error: Error | null }>
   resetPassword: (email: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
@@ -339,7 +339,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error: null }
   }
 
-  const signUp = async (email: string, password: string, fullName: string, shopName: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    shopName: string,
+    logoUrl?: string
+  ) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -348,6 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           full_name: fullName,
           shop_name: shopName,
           role: 'owner',
+          logo_url: logoUrl || null,
         },
       },
     })
@@ -356,24 +363,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (data.user) {
       try {
-        const { error: rpcErr } = await supabase.rpc('register_shop_and_owner', {
-          p_shop_name: shopName,
-          p_full_name: fullName,
-        })
+        const { data: userShop } = await supabase
+          .from('shops')
+          .select('id')
+          .eq('owner_id', data.user.id)
+          .maybeSingle()
 
-        if (rpcErr) {
+        if (userShop && logoUrl) {
+          await supabase
+            .from('shops')
+            .update({ logo_url: logoUrl })
+            .eq('id', userShop.id)
+        } else if (!userShop) {
           const { data: newShop, error: shopErr } = await supabase
             .from('shops')
             .insert({
               name: shopName,
               owner_id: data.user.id,
               currency: 'XOF',
+              logo_url: logoUrl || null,
             })
             .select()
             .single()
 
           if (!shopErr && newShop) {
-            await supabase.from('profiles').insert({
+            await supabase.from('profiles').upsert({
               id: data.user.id,
               shop_id: newShop.id,
               full_name: fullName,

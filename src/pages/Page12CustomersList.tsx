@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -24,9 +24,8 @@ export const Page12CustomersList: React.FC<Page12CustomersListProps> = ({ onNavi
   const [searchQuery, setSearchQuery] = useState('')
   const [filterDebtOnly, setFilterDebtOnly] = useState(false)
 
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -43,11 +42,11 @@ export const Page12CustomersList: React.FC<Page12CustomersListProps> = ({ onNavi
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadCustomers()
-  }, [shop?.id])
+  }, [loadCustomers])
 
   const filteredCustomers = useMemo(() => {
     return customers.filter((c) => {

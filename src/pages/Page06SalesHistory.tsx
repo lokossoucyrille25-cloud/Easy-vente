@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, formatDateTime } from '../lib/utils'
@@ -16,9 +16,8 @@ export const Page06SalesHistory: React.FC<Page06SalesHistoryProps> = ({ onNaviga
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all')
 
-  const loadSales = async () => {
+  const loadSales = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       let query = supabase
@@ -44,11 +43,11 @@ export const Page06SalesHistory: React.FC<Page06SalesHistoryProps> = ({ onNaviga
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id, statusFilter])
 
   useEffect(() => {
     loadSales()
-  }, [shop?.id, statusFilter])
+  }, [loadSales])
 
   // Filtrage par nom client
   const filteredSales = sales.filter((s) => {

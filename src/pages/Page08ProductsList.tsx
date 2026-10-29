@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -28,9 +28,8 @@ export const Page08ProductsList: React.FC<Page08ProductsListProps> = ({ onNaviga
 
   const targetShopId = shop?.id || profile?.shop_id
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!targetShopId) return
-    setLoading(true)
 
     try {
       // 1. Produits
@@ -56,11 +55,11 @@ export const Page08ProductsList: React.FC<Page08ProductsListProps> = ({ onNaviga
     } finally {
       setLoading(false)
     }
-  }
+  }, [targetShopId])
 
   useEffect(() => {
     loadData()
-  }, [targetShopId])
+  }, [loadData])
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {

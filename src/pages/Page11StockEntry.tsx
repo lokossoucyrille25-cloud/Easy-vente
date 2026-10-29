@@ -41,8 +41,8 @@ export const Page11StockEntry: React.FC<Page11StockEntryProps> = ({ productId, o
       .then(({ data }) => {
         if (data) {
           setProducts(data as Product[])
-          if (!selectedProductId && data.length > 0) {
-            setSelectedProductId(data[0].id)
+          if (data.length > 0) {
+            setSelectedProductId((curr) => curr || data[0].id)
           }
         }
       })

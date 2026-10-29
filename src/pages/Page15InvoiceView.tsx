@@ -3,11 +3,14 @@ import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, formatDateTime } from '../lib/utils'
 import type { Invoice, Sale, SaleItem } from '../types/database'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 import { 
   ArrowLeft, 
   Printer, 
   Store, 
-  MessageCircle
+  MessageCircle,
+  Download
 } from 'lucide-react'
 
 interface Page15InvoiceViewProps {
@@ -99,9 +102,66 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
     window.open(url, '_blank')
   }
 
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
   // Impression native / PDF du navigateur
   const handlePrint = () => {
     window.print()
+  }
+
+  // Téléchargement direct du reçu / facture au format PDF
+  const handleDownloadPDF = async () => {
+    if (!invoice) return
+    const receiptElement = document.getElementById('invoice-receipt-card')
+    if (!receiptElement) return
+
+    try {
+      setDownloadingPdf(true)
+      const canvas = await html2canvas(receiptElement, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+
+      // Marges de 15mm pour un rendu élégant et centré
+      const margin = 15
+      const imgWidth = pageWidth - margin * 2
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      if (imgHeight <= pageHeight - margin * 2) {
+        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight)
+      } else {
+        let heightLeft = imgHeight
+        let position = margin
+
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight)
+        heightLeft -= (pageHeight - margin * 2)
+
+        while (heightLeft > 0) {
+          position = heightLeft - imgHeight + margin
+          pdf.addPage()
+          pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight)
+          heightLeft -= (pageHeight - margin * 2)
+        }
+      }
+
+      pdf.save(`Facture_${invoice.invoice_number}.pdf`)
+    } catch (err) {
+      console.error('Erreur génération PDF:', err)
+    } finally {
+      setDownloadingPdf(false)
+    }
   }
 
   if (loading) {
@@ -146,14 +206,31 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
             onClick={handleShareWhatsApp}
             className="p-2.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer shadow-md shadow-emerald-600/20"
             title="Partager sur WhatsApp"
+            aria-label="Partager sur WhatsApp"
           >
             <MessageCircle className="w-4 h-4" />
           </button>
           <button
             type="button"
+            onClick={handleDownloadPDF}
+            disabled={downloadingPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white transition cursor-pointer shadow disabled:opacity-50 text-xs font-bold"
+            title="Télécharger le PDF"
+            aria-label="Télécharger le PDF"
+          >
+            {downloadingPdf ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span>PDF</span>
+          </button>
+          <button
+            type="button"
             onClick={handlePrint}
             className="p-2.5 rounded-2xl bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 transition cursor-pointer shadow"
-            title="Imprimer / Exporter en PDF"
+            title="Imprimer"
+            aria-label="Imprimer"
           >
             <Printer className="w-4 h-4" />
           </button>
@@ -161,12 +238,25 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
       </div>
 
       {/* Facture Papier Format Ticket / Mobile A4 */}
-      <div className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-md border border-slate-200 space-y-6 print:shadow-none print:border-none print:p-0">
-        {/* Entête Boutique */}
+      <div 
+        id="invoice-receipt-card"
+        className="bg-white text-slate-900 rounded-3xl p-6 sm:p-8 shadow-md border border-slate-200 space-y-6 print:shadow-none print:border-none print:p-0"
+      >
+        {/* Entête Boutique avec Logo */}
         <div className="text-center border-b border-slate-200 pb-5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-700 text-white mb-2">
-            <Store className="w-6 h-6" />
-          </div>
+          {shop?.logo_url ? (
+            <div className="flex justify-center mb-2.5">
+              <img
+                src={shop.logo_url}
+                alt={shop.name}
+                className="w-16 h-16 object-contain rounded-2xl border border-slate-100 shadow-xs p-1 bg-white"
+              />
+            </div>
+          ) : (
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-700 text-white mb-2">
+              <Store className="w-6 h-6" />
+            </div>
+          )}
           <h2 className="text-xl font-black uppercase tracking-tight text-slate-900">
             {shop?.name}
           </h2>

@@ -31,6 +31,53 @@ interface SidebarProps {
   isOnline: boolean
 }
 
+interface NavItemProps {
+  id: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  badge?: string
+  currentPage: string
+  onNavigate: (page: string) => void
+}
+
+const NavItem: React.FC<NavItemProps> = ({
+  id,
+  label,
+  icon: Icon,
+  badge,
+  currentPage,
+  onNavigate,
+}) => {
+  const isActive = currentPage === id
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate(id)}
+      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${
+        isActive
+          ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
+      }`}
+    >
+      <div className="flex items-center gap-2.5 truncate">
+        <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
+        <span className="truncate">{label}</span>
+      </div>
+      {badge ? (
+        <span
+          className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+            isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+          }`}
+        >
+          {badge}
+        </span>
+      ) : (
+        isActive && <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
+      )}
+    </button>
+  )
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnline }) => {
   const { profile, shop, signOut } = useAuth()
   const { canInstall, isInstalled, promptInstall } = usePWAInstall()
@@ -42,44 +89,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
     }
   }
 
-  const NavItem = ({ 
-    id, 
-    label, 
-    icon: Icon, 
-    badge 
-  }: { 
-    id: string; 
-    label: string; 
-    icon: React.ComponentType<{ className?: string }>; 
-    badge?: string 
-  }) => {
-    const isActive = currentPage === id
-    return (
-      <button
-        type="button"
-        onClick={() => onNavigate(id)}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer select-none ${
-          isActive
-            ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
-            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
-        }`}
-      >
-        <div className="flex items-center gap-2.5 truncate">
-          <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-500'}`} />
-          <span className="truncate">{label}</span>
-        </div>
-        {badge ? (
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-            isActive ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-          }`}>
-            {badge}
-          </span>
-        ) : (
-          isActive && <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-70" />
-        )}
-      </button>
-    )
-  }
+  const renderNav = (id: string, label: string, icon: React.ComponentType<{ className?: string }>, badge?: string) => (
+    <NavItem
+      key={id}
+      id={id}
+      label={label}
+      icon={icon}
+      badge={badge}
+      currentPage={currentPage}
+      onNavigate={onNavigate}
+    />
+  )
 
   return (
     <aside className="hidden md:flex flex-col w-64 lg:w-72 bg-white dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 h-screen sticky top-0 shrink-0 select-none z-20">
@@ -138,8 +158,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
               Pilotage
             </p>
-            <NavItem id="dashboard" label="Tableau de bord" icon={BarChart3} />
-            <NavItem id="reports" label="Rapports financiers" icon={TrendingUp} />
+            {renderNav('dashboard', 'Tableau de bord', BarChart3)}
+            {renderNav('reports', 'Rapports financiers', TrendingUp)}
           </div>
         )}
 
@@ -148,9 +168,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
             Ventes & Caisse
           </p>
-          <NavItem id="new-sale" label="Encaisser une vente" icon={ShoppingBag} />
-          <NavItem id="sales-history" label="Historique des ventes" icon={History} />
-          <NavItem id="invoices-list" label="Factures & Reçus" icon={FileText} />
+          {renderNav('new-sale', 'Encaisser une vente', ShoppingBag)}
+          {renderNav('sales-history', 'Historique des ventes', History)}
+          {renderNav('invoices-list', 'Factures & Reçus', FileText)}
         </div>
 
         {/* Catalogue & Stocks (Propriétaire uniquement) */}
@@ -159,11 +179,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
               Catalogue & Stocks
             </p>
-            <NavItem id="products-list" label="Produits en rayon" icon={Package} />
-            <NavItem id="stock-status" label="Alertes & Niveaux" icon={AlertTriangle} />
-            <NavItem id="stock-entry" label="Entrée de stock" icon={PlusCircle} />
-            <NavItem id="inventory" label="Inventaire physique" icon={ClipboardCheck} />
-            <NavItem id="categories" label="Catégories" icon={Tag} />
+            {renderNav('products-list', 'Produits en rayon', Package)}
+            {renderNav('stock-status', 'Alertes & Niveaux', AlertTriangle)}
+            {renderNav('stock-entry', 'Entrée de stock', PlusCircle)}
+            {renderNav('inventory', 'Inventaire physique', ClipboardCheck)}
+            {renderNav('categories', 'Catégories', Tag)}
           </div>
         )}
 
@@ -172,7 +192,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
             Clients
           </p>
-          <NavItem id="customers-list" label="Clients & Dettes" icon={Users} />
+          {renderNav('customers-list', 'Clients & Dettes', Users)}
         </div>
 
         {/* Administration (Propriétaire) */}
@@ -181,9 +201,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
               Administration
             </p>
-            <NavItem id="sellers-management" label="Gestion des vendeurs" icon={ShieldCheck} />
-            <NavItem id="audit-logs" label="Journal d'audit" icon={ShieldAlert} />
-            <NavItem id="shop-settings" label="Paramètres boutique" icon={Settings} />
+            {renderNav('sellers-management', 'Gestion des vendeurs', ShieldCheck)}
+            {renderNav('audit-logs', "Journal d'audit", ShieldAlert)}
+            {renderNav('shop-settings', 'Paramètres boutique', Settings)}
           </div>
         )}
 
@@ -192,13 +212,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate, isOnl
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
             Mon compte & Hors-ligne
           </p>
-          <NavItem id="user-profile" label="Mon profil" icon={UserCircle} />
-          <NavItem 
-            id="offline-sync" 
-            label="État Hors-ligne & Sync" 
-            icon={isOnline ? Wifi : WifiOff} 
-            badge={isOnline ? 'En ligne' : 'Hors-ligne'}
-          />
+          {renderNav('user-profile', 'Mon profil', UserCircle)}
+          {renderNav(
+            'offline-sync',
+            'État Hors-ligne & Sync',
+            isOnline ? Wifi : WifiOff,
+            isOnline ? 'En ligne' : 'Hors-ligne'
+          )}
         </div>
 
         {/* CTA Installation PWA App (Desktop & Mobile) */}

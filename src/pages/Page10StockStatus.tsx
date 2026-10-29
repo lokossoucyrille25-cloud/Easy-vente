@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Product } from '../types/database'
@@ -24,9 +24,8 @@ export const Page10StockStatus: React.FC<Page10StockStatusProps> = ({ onNavigate
 
   const isOwner = profile?.role === 'owner'
 
-  const loadStockData = async () => {
+  const loadStockData = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -44,11 +43,11 @@ export const Page10StockStatus: React.FC<Page10StockStatusProps> = ({ onNavigate
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadStockData()
-  }, [shop?.id])
+  }, [loadStockData])
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {

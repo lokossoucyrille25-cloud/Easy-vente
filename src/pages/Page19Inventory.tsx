@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Product } from '../types/database'
@@ -27,9 +27,8 @@ export const Page19Inventory: React.FC<Page19InventoryProps> = ({ onNavigate }) 
 
   const isOwner = profile?.role === 'owner'
 
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -52,11 +51,11 @@ export const Page19Inventory: React.FC<Page19InventoryProps> = ({ onNavigate }) 
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadProducts()
-  }, [shop?.id])
+  }, [loadProducts])
 
   const handleQuantityChange = (productId: string, val: string) => {
     const num = Math.max(0, parseInt(val, 10) || 0)

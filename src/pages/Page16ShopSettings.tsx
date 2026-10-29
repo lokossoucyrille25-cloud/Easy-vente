@@ -10,7 +10,10 @@ import {
   Percent, 
   AlertCircle, 
   CheckCircle2, 
-  DollarSign
+  DollarSign,
+  Upload,
+  X,
+  Image as ImageIcon
 } from 'lucide-react'
 
 interface Page16ShopSettingsProps {
@@ -25,6 +28,7 @@ export const Page16ShopSettings: React.FC<Page16ShopSettingsProps> = ({ onNaviga
   const [currency, setCurrency] = useState('XOF')
   const [vatEnabled, setVatEnabled] = useState(false)
   const [vatRate, setVatRate] = useState<number>(18)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -40,8 +44,34 @@ export const Page16ShopSettings: React.FC<Page16ShopSettingsProps> = ({ onNaviga
       setCurrency(shop.currency || 'XOF')
       setVatEnabled(shop.vat_enabled || false)
       setVatRate(Number(shop.vat_rate) || 18)
+      setLogoUrl(shop.logo_url || null)
     }
   }, [shop])
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      setErrorMsg('Veuillez sélectionner un fichier image valide (PNG, JPG, WebP, SVG).')
+      return
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg("L'image sélectionnée dépasse la taille maximale de 2 Mo.")
+      return
+    }
+
+    setErrorMsg(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      setLogoUrl(reader.result as string)
+    }
+    reader.onerror = () => {
+      setErrorMsg('Erreur lors de la lecture du fichier image.')
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,6 +102,7 @@ export const Page16ShopSettings: React.FC<Page16ShopSettingsProps> = ({ onNaviga
           currency: currency.trim() || 'XOF',
           vat_enabled: vatEnabled,
           vat_rate: vatRate,
+          logo_url: logoUrl,
           updated_at: new Date().toISOString(),
         })
         .eq('id', shop.id)
@@ -129,8 +160,51 @@ export const Page16ShopSettings: React.FC<Page16ShopSettingsProps> = ({ onNaviga
         {/* Identité */}
         <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 space-y-3.5 shadow-sm">
           <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Coordonnées
+            Coordonnées & Logo
           </h2>
+
+          {/* Logo de la boutique */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+              Logo de la boutique
+            </label>
+            <div className="flex items-center gap-4 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 rounded-2xl">
+              {logoUrl ? (
+                <div className="relative w-16 h-16 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white shrink-0 shadow-xs">
+                  <img src={logoUrl} alt="Logo" className="w-full h-full object-contain p-1" />
+                  <button
+                    type="button"
+                    onClick={() => setLogoUrl(null)}
+                    aria-label="Supprimer le logo"
+                    className="absolute -top-1 -right-1 p-1 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-md transition cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center justify-center text-slate-400 bg-white/50 dark:bg-slate-800/50 shrink-0">
+                  <ImageIcon className="w-6 h-6 stroke-[1.5]" />
+                  <span className="text-[9px] mt-0.5">Aucun</span>
+                </div>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <label className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-xl hover:bg-emerald-100 transition cursor-pointer">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>{logoUrl ? 'Changer de logo' : 'Ajouter un logo'}</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    onChange={handleLogoChange}
+                    className="hidden"
+                  />
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  PNG, JPG ou SVG (max 2 Mo). Utilisé sur les reçus et factures.
+                </p>
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">

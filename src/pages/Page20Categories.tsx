@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Category } from '../types/database'
@@ -27,9 +27,8 @@ export const Page20Categories: React.FC<Page20CategoriesProps> = ({ onNavigate }
 
   const isOwner = profile?.role === 'owner'
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -46,11 +45,11 @@ export const Page20Categories: React.FC<Page20CategoriesProps> = ({ onNavigate }
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadCategories()
-  }, [shop?.id])
+  }, [loadCategories])
 
   const handleCreateCategory = async (e: React.FormEvent) => {
     e.preventDefault()

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { createSellerAccount } from '../lib/sellers'
@@ -44,9 +44,8 @@ export const Page17SellersManagement: React.FC<Page17SellersManagementProps> = (
   const isOwner = profile?.role === 'owner'
   const targetShopId = shop?.id || profile?.shop_id
 
-  const loadSellers = async () => {
+  const loadSellers = useCallback(async () => {
     if (!targetShopId) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -63,11 +62,11 @@ export const Page17SellersManagement: React.FC<Page17SellersManagementProps> = (
     } finally {
       setLoading(false)
     }
-  }
+  }, [targetShopId])
 
   useEffect(() => {
     loadSellers()
-  }, [targetShopId])
+  }, [loadSellers])
 
   // Création du compte vendeur
   const handleAddSeller = async (e: React.FormEvent) => {

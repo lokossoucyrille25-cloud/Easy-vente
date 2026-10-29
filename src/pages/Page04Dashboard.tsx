@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -27,9 +27,8 @@ export const Page04Dashboard: React.FC<Page04DashboardProps> = ({ onNavigate }) 
   const [totalCustomerDebt, setTotalCustomerDebt] = useState(0)
   const [customersInDebtCount, setCustomersInDebtCount] = useState(0)
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       // 1. Ventes du jour (début de la journée locale à minuit)
@@ -78,11 +77,11 @@ export const Page04Dashboard: React.FC<Page04DashboardProps> = ({ onNavigate }) 
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadDashboardData()
-  }, [shop?.id])
+  }, [loadDashboardData])
 
   return (
     <div className="space-y-6 pb-24 max-w-6xl mx-auto w-full">

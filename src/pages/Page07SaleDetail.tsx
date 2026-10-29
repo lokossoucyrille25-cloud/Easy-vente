@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, formatDateTime } from '../lib/utils'
@@ -33,9 +33,8 @@ export const Page07SaleDetail: React.FC<Page07SaleDetailProps> = ({ saleId, onNa
 
   const isOwner = profile?.role === 'owner'
 
-  const loadSaleDetail = async () => {
+  const loadSaleDetail = useCallback(async () => {
     if (!saleId || !shop?.id) return
-    setLoading(true)
 
     try {
       // 1. Vente + Client
@@ -75,11 +74,11 @@ export const Page07SaleDetail: React.FC<Page07SaleDetailProps> = ({ saleId, onNa
     } finally {
       setLoading(false)
     }
-  }
+  }, [saleId, shop?.id])
 
   useEffect(() => {
     loadSaleDetail()
-  }, [saleId, shop?.id])
+  }, [loadSaleDetail])
 
   // Annulation de la vente (Réservé au propriétaire)
   const handleCancelSale = async () => {

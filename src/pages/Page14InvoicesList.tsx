@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, formatDateTime } from '../lib/utils'
@@ -21,9 +21,8 @@ export const Page14InvoicesList: React.FC<Page14InvoicesListProps> = ({ onNaviga
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
-  const loadInvoices = async () => {
+  const loadInvoices = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       const { data, error } = await supabase
@@ -46,11 +45,11 @@ export const Page14InvoicesList: React.FC<Page14InvoicesListProps> = ({ onNaviga
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id])
 
   useEffect(() => {
     loadInvoices()
-  }, [shop?.id])
+  }, [loadInvoices])
 
   const filteredInvoices = useMemo(() => {
     if (!searchQuery.trim()) return invoices

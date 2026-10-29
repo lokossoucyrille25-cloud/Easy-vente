@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { BottomNav } from './components/layout/BottomNav'
 import { Sidebar } from './components/layout/Sidebar'
 import { DesktopHeader } from './components/layout/DesktopHeader'
+import { syncPendingSales } from './lib/offlineSync'
 
 // Page d'accueil & Vitrine
 import { Page00Landing } from './pages/Page00Landing'
@@ -75,7 +76,24 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<string>('dashboard')
   const [pageParams, setPageParams] = useState<Record<string, string>>({})
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [isOnline] = useState(navigator.onLine)
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator !== 'undefined' ? navigator.onLine : true))
+
+  // Écoute de l'état réseau avec synchronisation automatique en arrière-plan à la reconnexion
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      syncPendingSales().catch((err) => console.error('Erreur auto-sync retour en ligne:', err))
+    }
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   // Redirection automatique des vendeurs vers l'espace Caisse
   useEffect(() => {

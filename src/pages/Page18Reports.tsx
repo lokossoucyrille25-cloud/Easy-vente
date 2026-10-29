@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency } from '../lib/utils'
@@ -30,9 +30,8 @@ export const Page18Reports: React.FC<Page18ReportsProps> = ({ onNavigate }) => {
 
   const isOwner = profile?.role === 'owner'
 
-  const loadFinancialReports = async () => {
+  const loadFinancialReports = useCallback(async () => {
     if (!shop?.id) return
-    setLoading(true)
 
     try {
       // 1. Valeur totale du stock actuel (current_stock * purchase_price)
@@ -120,11 +119,11 @@ export const Page18Reports: React.FC<Page18ReportsProps> = ({ onNavigate }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [shop?.id, period])
 
   useEffect(() => {
     loadFinancialReports()
-  }, [shop?.id, period])
+  }, [loadFinancialReports])
 
   if (!isOwner) {
     return (

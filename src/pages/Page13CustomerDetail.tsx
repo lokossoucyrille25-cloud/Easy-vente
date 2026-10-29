@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 import { formatCurrency, formatDateTime } from '../lib/utils'
@@ -42,7 +42,7 @@ export const Page13CustomerDetail: React.FC<Page13CustomerDetailProps> = ({ cust
 
   const isEditing = Boolean(customerId)
 
-  const loadCustomerData = async () => {
+  const loadCustomerData = useCallback(async () => {
     if (!customerId || !shop?.id) return
     setLoading(true)
 
@@ -80,13 +80,13 @@ export const Page13CustomerDetail: React.FC<Page13CustomerDetailProps> = ({ cust
     } finally {
       setLoading(false)
     }
-  }
+  }, [customerId, shop?.id])
 
   useEffect(() => {
     if (customerId) {
       loadCustomerData()
     }
-  }, [customerId, shop?.id])
+  }, [customerId, loadCustomerData])
 
   // Sauvegarde des coordonnées
   const handleSubmit = async (e: React.FormEvent) => {
