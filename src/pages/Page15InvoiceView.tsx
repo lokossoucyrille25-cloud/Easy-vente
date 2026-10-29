@@ -12,7 +12,9 @@ import {
   MessageCircle,
   Download,
   CheckCircle2,
-  X
+  X,
+  Eye,
+  FileText
 } from 'lucide-react'
 
 interface Page15InvoiceViewProps {
@@ -77,8 +79,14 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
   }, [invoiceId, shop?.id])
 
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [viewingPdf, setViewingPdf] = useState(false)
   const [sharingWhatsapp, setSharingWhatsapp] = useState(false)
-  const [whatsappInfoModal, setWhatsappInfoModal] = useState<string | null>(null)
+  const [desktopShareModalOpen, setDesktopShareModalOpen] = useState(false)
+  const [generatedPdfInfo, setGeneratedPdfInfo] = useState<{
+    blobUrl: string
+    filename: string
+    cleanPhone: string
+  } | null>(null)
 
   // Impression native / PDF du navigateur
   const handlePrint = () => {
@@ -135,12 +143,27 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
     return { pdf, filename, blob }
   }
 
+  // Visualiser directement le PDF dans le navigateur
+  const handleViewPDF = async () => {
+    try {
+      setViewingPdf(true)
+      const generated = await generatePdfDoc()
+      if (generated) {
+        const blobUrl = URL.createObjectURL(generated.blob)
+        window.open(blobUrl, '_blank')
+      }
+    } catch (err) {
+      console.error('Erreur affichage PDF:', err)
+    } finally {
+      setViewingPdf(false)
+    }
+  }
+
   // Partage WhatsApp du reçu de vente avec le fichier PDF
   const handleShareWhatsApp = async () => {
     if (!sale || !invoice || !shop) return
 
     setSharingWhatsapp(true)
-    setWhatsappInfoModal(null)
 
     try {
       const generated = await generatePdfDoc()
@@ -152,53 +175,32 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
       const { pdf, filename, blob } = generated
       const file = new File([blob], filename, { type: 'application/pdf' })
 
-      let text = `*FACTURE / REÇU : ${invoice.invoice_number}*\n`
-      text += `*Boutique :* ${shop.name}\n`
-      if (shop.phone) text += `*Tél :* ${shop.phone}\n`
-      text += `*Date :* ${formatDateTime(invoice.invoice_date)}\n`
-      text += `*Client :* ${sale.customer?.name || 'Client comptoir'}\n`
-      text += `------------------------\n`
-      items.forEach((item) => {
-        text += `• ${item.product?.name || 'Article'} (x${item.quantity}) : ${formatCurrency(item.total_price, shop.currency)}\n`
-      })
-      text += `------------------------\n`
-      if (sale.discount > 0) text += `*Remise :* -${formatCurrency(sale.discount, shop.currency)}\n`
-      if (sale.vat_amount > 0) text += `*TVA :* +${formatCurrency(sale.vat_amount, shop.currency)}\n`
-      text += `*TOTAL :* ${formatCurrency(sale.total, shop.currency)}\n`
-      text += `*Payé :* ${formatCurrency(sale.paid_amount, shop.currency)}\n`
-      if (sale.remaining_amount > 0) {
-        text += `*RESTE À PAYER :* ${formatCurrency(sale.remaining_amount, shop.currency)}\n`
-      }
-      text += `------------------------\n`
-      text += `📎 Veuillez trouver ci-joint votre reçu au format PDF.\n`
-      text += `Merci pour votre fidélité !`
-
-      // 1. Partage direct du fichier PDF via Web Share API (smartphones Android, iOS, PWA)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // 1. Sur Mobile : Partage direct et exclusif du fichier PDF (Web Share API)
+      // Ne PAS passer de 'text' car WhatsApp Mobile privilégie le texte et ignore le PDF attaché !
+      if (typeof navigator !== 'undefined' && navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: `Facture ${invoice.invoice_number}`,
-          text: text,
+          title: filename,
         })
         return
       }
 
-      // 2. Repli pour les ordinateurs / navigateurs sans support direct du partage de fichier :
-      // On télécharge le PDF automatiquement sur la machine
+      // 2. Sur Ordinateur / Navigateur Desktop :
+      // Téléchargement du PDF et ouverture de la modal d'aide WhatsApp
       pdf.save(filename)
-
-      // Et on ouvre WhatsApp Web
+      const blobUrl = URL.createObjectURL(blob)
       const cleanPhone = sale.customer?.phone?.replace(/\D/g, '') || ''
-      const waUrl = cleanPhone 
-        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
-        : `https://wa.me/?text=${encodeURIComponent(text)}`
 
-      window.open(waUrl, '_blank')
-      setWhatsappInfoModal(`Le fichier PDF (${filename}) a été téléchargé sur votre appareil. La discussion WhatsApp est ouverte : vous pouvez maintenant y glisser le fichier PDF.`)
+      setGeneratedPdfInfo({
+        blobUrl,
+        filename,
+        cleanPhone,
+      })
+      setDesktopShareModalOpen(true)
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
         console.error('Erreur partage WhatsApp PDF:', err)
-        alert("Une erreur est survenue lors de la préparation du PDF pour WhatsApp.")
+        alert("Une erreur est survenue lors de la préparation du PDF.")
       }
     } finally {
       setSharingWhatsapp(false)
@@ -256,14 +258,50 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
           <span>Toutes les factures</span>
         </button>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Visualisation directe du document PDF */}
+          <button
+            type="button"
+            onClick={handleViewPDF}
+            disabled={viewingPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-200 transition cursor-pointer shadow-xs disabled:opacity-50 text-xs font-bold"
+            title="Ouvrir le document PDF"
+            aria-label="Ouvrir le document PDF"
+          >
+            {viewingPdf ? (
+              <span className="w-4 h-4 border-2 border-slate-600 border-t-transparent animate-spin rounded-full" />
+            ) : (
+              <Eye className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">Voir PDF</span>
+          </button>
+
+          {/* Téléchargement direct du fichier PDF */}
+          <button
+            type="button"
+            onClick={handleDownloadPDF}
+            disabled={downloadingPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white transition cursor-pointer shadow disabled:opacity-50 text-xs font-bold"
+            title="Télécharger le fichier PDF"
+            aria-label="Télécharger le fichier PDF"
+          >
+            {downloadingPdf ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">Télécharger</span>
+            <span className="sm:hidden">PDF</span>
+          </button>
+
+          {/* Partage WhatsApp du document PDF */}
           <button
             type="button"
             onClick={handleShareWhatsApp}
             disabled={sharingWhatsapp}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer shadow-md shadow-emerald-600/20 disabled:opacity-50 text-xs font-bold"
-            title="Partager le PDF sur WhatsApp"
-            aria-label="Partager le PDF sur WhatsApp"
+            title="Envoyer la facture PDF sur WhatsApp"
+            aria-label="Envoyer la facture PDF sur WhatsApp"
           >
             {sharingWhatsapp ? (
               <span className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
@@ -272,21 +310,8 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
             )}
             <span>WhatsApp PDF</span>
           </button>
-          <button
-            type="button"
-            onClick={handleDownloadPDF}
-            disabled={downloadingPdf}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white transition cursor-pointer shadow disabled:opacity-50 text-xs font-bold"
-            title="Télécharger le PDF"
-            aria-label="Télécharger le PDF"
-          >
-            {downloadingPdf ? (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
-            ) : (
-              <Download className="w-4 h-4" />
-            )}
-            <span>PDF</span>
-          </button>
+
+          {/* Impression */}
           <button
             type="button"
             onClick={handlePrint}
@@ -299,21 +324,71 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
         </div>
       </div>
 
-      {/* Message d'information WhatsApp */}
-      {whatsappInfoModal && (
-        <div className="flex items-start justify-between gap-3 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-xs text-emerald-800 dark:text-emerald-200 shadow-sm no-print">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <span>{whatsappInfoModal}</span>
+      {/* Modal d'accompagnement WhatsApp pour Ordinateur */}
+      {desktopShareModalOpen && generatedPdfInfo && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                    Facture PDF générée
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {generatedPdfInfo.filename}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDesktopShareModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl cursor-pointer"
+                aria-label="Fermer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-2xl text-xs text-emerald-800 dark:text-emerald-200 space-y-2">
+              <p className="font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                Le fichier PDF officiel a été téléchargé sur votre ordinateur.
+              </p>
+              <div className="text-[11px] text-emerald-700 dark:text-emerald-300 space-y-1">
+                <p>1. Cliquez ci-dessous sur <strong>« Ouvrir la discussion WhatsApp »</strong>.</p>
+                <p>2. Dans WhatsApp Web, cliquez sur le trombone <strong>📎 &gt; 📄 Document</strong> et choisissez le fichier téléchargé.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const waUrl = generatedPdfInfo.cleanPhone
+                    ? `https://wa.me/${generatedPdfInfo.cleanPhone}`
+                    : `https://wa.me/`
+                  window.open(waUrl, '_blank')
+                  setDesktopShareModalOpen(false)
+                }}
+                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer transition"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Ouvrir la discussion WhatsApp</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.open(generatedPdfInfo.blobUrl, '_blank')}
+                className="w-full py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 font-bold rounded-2xl text-xs flex items-center justify-center gap-2 cursor-pointer transition"
+              >
+                <Eye className="w-4 h-4" />
+                <span>Voir le fichier PDF à l'écran</span>
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setWhatsappInfoModal(null)}
-            className="text-emerald-700 dark:text-emerald-300 hover:opacity-75 font-bold cursor-pointer p-0.5"
-            aria-label="Fermer la notification"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
       )}
 
