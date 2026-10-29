@@ -10,7 +10,9 @@ import {
   Printer, 
   Store, 
   MessageCircle,
-  Download
+  Download,
+  CheckCircle2,
+  X
 } from 'lucide-react'
 
 interface Page15InvoiceViewProps {
@@ -74,89 +76,143 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
     fetchInvoiceDetails()
   }, [invoiceId, shop?.id])
 
-  // Partage WhatsApp du reçu de vente
-  const handleShareWhatsApp = () => {
-    if (!sale || !invoice || !shop) return
-
-    let text = `*FACTURE / REÇU : ${invoice.invoice_number}*\n`
-    text += `*Boutique :* ${shop.name}\n`
-    if (shop.phone) text += `*Tél :* ${shop.phone}\n`
-    text += `*Date :* ${formatDateTime(invoice.invoice_date)}\n`
-    text += `*Client :* ${sale.customer?.name || 'Client comptoir'}\n`
-    text += `------------------------\n`
-    items.forEach((item) => {
-      text += `• ${item.product?.name || 'Article'} (x${item.quantity}) : ${formatCurrency(item.total_price, shop.currency)}\n`
-    })
-    text += `------------------------\n`
-    if (sale.discount > 0) text += `*Remise :* -${formatCurrency(sale.discount, shop.currency)}\n`
-    if (sale.vat_amount > 0) text += `*TVA :* +${formatCurrency(sale.vat_amount, shop.currency)}\n`
-    text += `*TOTAL :* ${formatCurrency(sale.total, shop.currency)}\n`
-    text += `*Payé :* ${formatCurrency(sale.paid_amount, shop.currency)}\n`
-    if (sale.remaining_amount > 0) {
-      text += `*RESTE À PAYER :* ${formatCurrency(sale.remaining_amount, shop.currency)}\n`
-    }
-    text += `------------------------\n`
-    text += `Merci pour votre fidélité !`
-
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`
-    window.open(url, '_blank')
-  }
-
   const [downloadingPdf, setDownloadingPdf] = useState(false)
+  const [sharingWhatsapp, setSharingWhatsapp] = useState(false)
+  const [whatsappInfoModal, setWhatsappInfoModal] = useState<string | null>(null)
 
   // Impression native / PDF du navigateur
   const handlePrint = () => {
     window.print()
   }
 
-  // Téléchargement direct du reçu / facture au format PDF
-  const handleDownloadPDF = async () => {
-    if (!invoice) return
+  // Fonction centrale pour générer le document PDF à partir du reçu
+  const generatePdfDoc = async (): Promise<{ pdf: jsPDF; filename: string; blob: Blob } | null> => {
+    if (!invoice) return null
     const receiptElement = document.getElementById('invoice-receipt-card')
-    if (!receiptElement) return
+    if (!receiptElement) return null
 
-    try {
-      setDownloadingPdf(true)
-      const canvas = await html2canvas(receiptElement, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      })
+    const canvas = await html2canvas(receiptElement, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    })
 
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      })
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    })
 
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
 
-      // Marges de 15mm pour un rendu élégant et centré
-      const margin = 15
-      const imgWidth = pageWidth - margin * 2
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+    // Marges de 15mm pour un rendu élégant et centré
+    const margin = 15
+    const imgWidth = pageWidth - margin * 2
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
 
-      if (imgHeight <= pageHeight - margin * 2) {
-        pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight)
-      } else {
-        let heightLeft = imgHeight
-        let position = margin
+    if (imgHeight <= pageHeight - margin * 2) {
+      pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight)
+    } else {
+      let heightLeft = imgHeight
+      let position = margin
 
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight)
+      heightLeft -= (pageHeight - margin * 2)
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight + margin
+        pdf.addPage()
         pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight)
         heightLeft -= (pageHeight - margin * 2)
+      }
+    }
 
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight + margin
-          pdf.addPage()
-          pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight)
-          heightLeft -= (pageHeight - margin * 2)
-        }
+    const filename = `Facture_${invoice.invoice_number}.pdf`
+    const blob = pdf.output('blob')
+    return { pdf, filename, blob }
+  }
+
+  // Partage WhatsApp du reçu de vente avec le fichier PDF
+  const handleShareWhatsApp = async () => {
+    if (!sale || !invoice || !shop) return
+
+    setSharingWhatsapp(true)
+    setWhatsappInfoModal(null)
+
+    try {
+      const generated = await generatePdfDoc()
+      if (!generated) {
+        alert("Impossible de générer le document PDF pour le partage.")
+        return
       }
 
-      pdf.save(`Facture_${invoice.invoice_number}.pdf`)
+      const { pdf, filename, blob } = generated
+      const file = new File([blob], filename, { type: 'application/pdf' })
+
+      let text = `*FACTURE / REÇU : ${invoice.invoice_number}*\n`
+      text += `*Boutique :* ${shop.name}\n`
+      if (shop.phone) text += `*Tél :* ${shop.phone}\n`
+      text += `*Date :* ${formatDateTime(invoice.invoice_date)}\n`
+      text += `*Client :* ${sale.customer?.name || 'Client comptoir'}\n`
+      text += `------------------------\n`
+      items.forEach((item) => {
+        text += `• ${item.product?.name || 'Article'} (x${item.quantity}) : ${formatCurrency(item.total_price, shop.currency)}\n`
+      })
+      text += `------------------------\n`
+      if (sale.discount > 0) text += `*Remise :* -${formatCurrency(sale.discount, shop.currency)}\n`
+      if (sale.vat_amount > 0) text += `*TVA :* +${formatCurrency(sale.vat_amount, shop.currency)}\n`
+      text += `*TOTAL :* ${formatCurrency(sale.total, shop.currency)}\n`
+      text += `*Payé :* ${formatCurrency(sale.paid_amount, shop.currency)}\n`
+      if (sale.remaining_amount > 0) {
+        text += `*RESTE À PAYER :* ${formatCurrency(sale.remaining_amount, shop.currency)}\n`
+      }
+      text += `------------------------\n`
+      text += `📎 Veuillez trouver ci-joint votre reçu au format PDF.\n`
+      text += `Merci pour votre fidélité !`
+
+      // 1. Partage direct du fichier PDF via Web Share API (smartphones Android, iOS, PWA)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Facture ${invoice.invoice_number}`,
+          text: text,
+        })
+        return
+      }
+
+      // 2. Repli pour les ordinateurs / navigateurs sans support direct du partage de fichier :
+      // On télécharge le PDF automatiquement sur la machine
+      pdf.save(filename)
+
+      // Et on ouvre WhatsApp Web
+      const cleanPhone = sale.customer?.phone?.replace(/\D/g, '') || ''
+      const waUrl = cleanPhone 
+        ? `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`
+        : `https://wa.me/?text=${encodeURIComponent(text)}`
+
+      window.open(waUrl, '_blank')
+      setWhatsappInfoModal(`Le fichier PDF (${filename}) a été téléchargé sur votre appareil. La discussion WhatsApp est ouverte : vous pouvez maintenant y glisser le fichier PDF.`)
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Erreur partage WhatsApp PDF:', err)
+        alert("Une erreur est survenue lors de la préparation du PDF pour WhatsApp.")
+      }
+    } finally {
+      setSharingWhatsapp(false)
+    }
+  }
+
+  // Téléchargement direct du reçu / facture au format PDF
+  const handleDownloadPDF = async () => {
+    try {
+      setDownloadingPdf(true)
+      const generated = await generatePdfDoc()
+      if (generated) {
+        generated.pdf.save(generated.filename)
+      }
     } catch (err) {
       console.error('Erreur génération PDF:', err)
     } finally {
@@ -204,11 +260,17 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
           <button
             type="button"
             onClick={handleShareWhatsApp}
-            className="p-2.5 rounded-2xl bg-emerald-600 text-white hover:bg-emerald-700 transition cursor-pointer shadow-md shadow-emerald-600/20"
-            title="Partager sur WhatsApp"
-            aria-label="Partager sur WhatsApp"
+            disabled={sharingWhatsapp}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer shadow-md shadow-emerald-600/20 disabled:opacity-50 text-xs font-bold"
+            title="Partager le PDF sur WhatsApp"
+            aria-label="Partager le PDF sur WhatsApp"
           >
-            <MessageCircle className="w-4 h-4" />
+            {sharingWhatsapp ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent animate-spin rounded-full" />
+            ) : (
+              <MessageCircle className="w-4 h-4" />
+            )}
+            <span>WhatsApp PDF</span>
           </button>
           <button
             type="button"
@@ -236,6 +298,24 @@ export const Page15InvoiceView: React.FC<Page15InvoiceViewProps> = ({ invoiceId,
           </button>
         </div>
       </div>
+
+      {/* Message d'information WhatsApp */}
+      {whatsappInfoModal && (
+        <div className="flex items-start justify-between gap-3 p-3.5 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl text-xs text-emerald-800 dark:text-emerald-200 shadow-sm no-print">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>{whatsappInfoModal}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWhatsappInfoModal(null)}
+            className="text-emerald-700 dark:text-emerald-300 hover:opacity-75 font-bold cursor-pointer p-0.5"
+            aria-label="Fermer la notification"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Facture Papier Format Ticket / Mobile A4 */}
       <div 
